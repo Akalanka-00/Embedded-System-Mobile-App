@@ -39,6 +39,11 @@ Future<LoginData?> getLoginData() async {
   );
 }
 
+  Future<String?> getUserId() async {
+    final loginData = await getLoginData();
+    return loginData?.userID;
+  }
+
   Future<void> removeLoginData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyLogin_UserId);

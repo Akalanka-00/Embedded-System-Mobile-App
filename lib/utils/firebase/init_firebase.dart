@@ -38,7 +38,6 @@ class FirebaseService {
       final snapshot = await _firestore.collection(collectionName).get();
       final docs = snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
       for (var doc in docs) {
-        log("doc: $doc");
       }
       return docs.firstWhere((doc) => doc['id'] == docId);
     } catch (e) {

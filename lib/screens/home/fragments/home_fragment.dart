@@ -1,12 +1,14 @@
+// home_fragment.dart
 import 'package:flutter/material.dart';
 import 'package:skynet/data/room_data.dart';
 import 'package:skynet/model/auth_data.model.dart';
 import 'package:skynet/utils/firebase/db_service.dart';
-
-import '../../../utils/shared_preferences/shared_preferences_service.dart';
+import 'package:skynet/utils/shared_preferences/shared_preferences_service.dart';
+import 'package:skynet/widgets/device_card.dart';
+import 'package:skynet/widgets/room_section.dart';
 
 class HomeFragment extends StatefulWidget {
-  HomeFragment({super.key});
+  const HomeFragment({super.key});
 
   @override
   _HomeFragmentState createState() => _HomeFragmentState();
@@ -18,21 +20,6 @@ class _HomeFragmentState extends State<HomeFragment> {
   bool _isBluetoothConnected = false;
   int _selectedIndex = 0;
   final _dbService = DbService();
-
-  // final List<Map<String, dynamic>> rooms = [
-  //   {"name": "Living Room", "icon": Icons.chair_alt},
-  //   {"name": "Bed Room", "icon": Icons.bed},
-  //   {"name": "Bath Room", "icon": Icons.bathtub},
-  //   {"name": "Kitchen", "icon": Icons.kitchen},
-  //   {"name": "Dining", "icon": Icons.dining},
-  // ];
-
-  // final List<Map<String, dynamic>> connectedDevices = [
-  //   {"name": "Lighting", "status": true, "icon": Icons.lightbulb},
-  //   {"name": "Smart TV", "status": false, "icon": Icons.tv},
-  //   {"name": "CC Camera", "status": true, "icon": Icons.camera_alt},
-  //   {"name": "Home Pod Mini", "status": false, "icon": Icons.speaker},
-  // ];
 
   @override
   void initState() {
@@ -55,19 +42,19 @@ class _HomeFragmentState extends State<HomeFragment> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Skynet", style: TextStyle(color: Colors.white)),
+        title: const Text("Home", style: TextStyle(color: Colors.white)),
         automaticallyImplyLeading: false,
         backgroundColor: const Color.fromARGB(255, 6, 26, 94),
         actions: [
           IconButton(
-            icon: Icon(Icons.notifications, color: Colors.white),
+            icon: const Icon(Icons.notifications, color: Colors.white),
             onPressed: () {
               // Handle notification icon press
             },
           ),
         ],
-        elevation: 4.0, // Add shadow to the AppBar
-        shadowColor: Colors.black.withOpacity(0.5), // Customize shadow color
+        elevation: 4.0,
+        shadowColor: Colors.black.withOpacity(0.5),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -88,17 +75,17 @@ class _HomeFragmentState extends State<HomeFragment> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      const Text(
                         "Rooms",
                         style: TextStyle(
-                          color: const Color.fromARGB(255, 6, 26, 94),
+                          color: Color.fromARGB(255, 6, 26, 94),
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       IconButton(
-                        icon: Icon(Icons.more_vert,
-                            color: const Color.fromARGB(255, 6, 26, 94)),
+                        icon: const Icon(Icons.more_vert,
+                            color: Color.fromARGB(255, 6, 26, 94)),
                         onPressed: () {
                           // Handle three dot icon press
                         },
@@ -106,7 +93,14 @@ class _HomeFragmentState extends State<HomeFragment> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  _buildRoomSection(),
+                  RoomSection(
+                    selectedIndex: _selectedIndex,
+                    onRoomSelected: (index) {
+                      setState(() {
+                        _selectedIndex = index;
+                      });
+                    },
+                  ),
                 ],
               ),
             ),
@@ -116,19 +110,22 @@ class _HomeFragmentState extends State<HomeFragment> {
                 width: double.maxFinite,
                 child: GridView.builder(
                   itemCount: room_data_list[_selectedIndex]['devices'].length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2, // Number of items per row
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
                   ),
                   itemBuilder: (BuildContext context, int index) {
                     final device =
-                        room_data_list[_selectedIndex]['devices'][index];
-                    return _buildDeviceCard(
-                        room_data_list[_selectedIndex]['name'], device);
+                    room_data_list[_selectedIndex]['devices'][index];
+                    return DeviceCard(
+                      isSelected: true,
+                      room: room_data_list[_selectedIndex]['name'],
+                      device: device,
+                    );
                   },
                   shrinkWrap: true,
-                  physics: NeverScrollableScrollPhysics(),
+                  physics: const NeverScrollableScrollPhysics(),
                 ),
               ),
             ),
@@ -138,141 +135,7 @@ class _HomeFragmentState extends State<HomeFragment> {
     );
   }
 
-// This function will display the device card with the number of devices
-  Widget _buildDeviceCard(String room, category) {
-    String deviceName = category['name'];
-    IconData deviceIcon = category['icon'];
-    return FutureBuilder<LoginData?>(
-      future: _sharedPreferencesService.getLoginData(),
-      builder: (context, loginDataSnapshot) {
-        if (loginDataSnapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
-        }
-        if (!loginDataSnapshot.hasData) {
-          return Center(child: Text('Login data not found'));
-        }
-
-        String userId = loginDataSnapshot.data!.userID;
-
-        return FutureBuilder<List<Map<String, dynamic>>>(
-          future: _dbService.getDeviceByCategory(userId, room, deviceName),
-          builder: (context, devicesSnapshot) {
-            int totalDevices = 0;
-            int connectedDevices = 0;
-            if (devicesSnapshot.connectionState == ConnectionState.waiting) {
-              return Center(child: CircularProgressIndicator());
-            }
-            if (!devicesSnapshot.hasData || devicesSnapshot.data!.isEmpty) {
-            } else {
-              List<Map<String, dynamic>> devices = devicesSnapshot.data!;
-              totalDevices = devices.length;
-              connectedDevices =
-                  devices.where((device) => device['status'] == true).length;
-            }
-
-            return Card(
-              color: Colors.blueAccent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      deviceIcon, // Example icon for devices
-                      size: 32,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      deviceName,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      totalDevices == 0
-                          ? 'No Devices Found'
-                          : connectedDevices == 0
-                              ? 'No Devices Connected'
-                              : '$connectedDevices/$totalDevices Devices Connected',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildRoomSection() {
-    final data = room_data_list;
-    return SizedBox(
-      height: 100, // Adjust the height for the scrollable bar
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: data.length,
-        itemBuilder: (context, index) {
-          final room = data[index];
-          final isSelected = index == _selectedIndex;
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedIndex = index; // Update the selected index
-              });
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Colors.blueAccent
-                          : Colors.blueAccent.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Icon(
-                      room['icon'],
-                      size: 32,
-                      color: isSelected ? Colors.white : Colors.blueAccent,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    room['name'],
-                    style: TextStyle(
-                      color: isSelected
-                          ? Colors.blueAccent
-                          : const Color.fromARGB(255, 6, 26, 94),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildBannerCard(username) {
+  Widget _buildBannerCard(String username) {
     return SizedBox(
       width: double.infinity,
       child: Card(
@@ -295,14 +158,14 @@ class _HomeFragmentState extends State<HomeFragment> {
                   children: [
                     Text(
                       "Welcome, \n$username",
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Text(
+                    const Text(
                       "Your home is in your hands",
                       style: TextStyle(
                         color: Colors.white,
@@ -324,20 +187,19 @@ class _HomeFragmentState extends State<HomeFragment> {
                     ),
                     const SizedBox(height: 10),
                     Padding(
-                      padding: const EdgeInsets.only(
-                          right: 10.0), // Adjust the padding here
+                      padding: const EdgeInsets.only(right: 10.0),
                       child: Row(
                         children: [
                           Container(
                             width: 10,
                             height: 10,
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               color: Colors.green,
                               shape: BoxShape.circle,
                             ),
                           ),
                           const SizedBox(width: 5),
-                          Text(
+                          const Text(
                             "Connected",
                             style: TextStyle(
                               color: Colors.white,
@@ -373,7 +235,7 @@ class _HomeFragmentState extends State<HomeFragment> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+            children: const [
               Text(
                 "Important News",
                 style: TextStyle(
@@ -382,7 +244,7 @@ class _HomeFragmentState extends State<HomeFragment> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
               Text(
                 "Schedulers are going to run soon. Please be prepared.",
                 style: TextStyle(

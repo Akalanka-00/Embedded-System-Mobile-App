@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:skynet/screens/home/fragments/add_fragment.dart';
 import 'package:skynet/screens/home/fragments/home_fragment.dart';
 
 class HomePage extends StatefulWidget {
@@ -9,11 +10,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 2;
   final screens = [
     HomeFragment(),
     Container(color: Colors.red,),
-    Container(color: Colors.green,),
+    AddFragment(),
     Container(color: Colors.black,),
     Container(color: Colors.blue,),
   ];
