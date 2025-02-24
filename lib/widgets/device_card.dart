@@ -31,10 +31,8 @@ class DeviceCard extends StatelessWidget {
           return const Center(child: Text('Login data not found'));
         }
 
-        String userId = loginDataSnapshot.data!.userID;
-
         return FutureBuilder<List<Map<String, dynamic>>>(
-          future: _dbService.getDeviceByCategory(userId, room, device['name']),
+          future: _dbService.getDeviceByCategory( room, device['name']),
           builder: (context, devicesSnapshot) {
             int totalDevices = 0;
             int connectedDevices = 0;
@@ -47,8 +45,6 @@ class DeviceCard extends StatelessWidget {
               connectedDevices =
                   devices.where((d) => d['status'] == true).length;
 
-              print("**************************************");
-              print(totalDevices == 0);
             }
 
 

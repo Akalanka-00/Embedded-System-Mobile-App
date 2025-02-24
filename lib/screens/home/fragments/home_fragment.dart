@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:skynet/data/room_data.dart';
 import 'package:skynet/model/auth_data.model.dart';
+import 'package:skynet/screens/home/device_detail.dart';
 import 'package:skynet/utils/firebase/db_service.dart';
 import 'package:skynet/utils/shared_preferences/shared_preferences_service.dart';
 import 'package:skynet/widgets/device_card.dart';
@@ -116,14 +117,28 @@ class _HomeFragmentState extends State<HomeFragment> {
                     mainAxisSpacing: 16,
                   ),
                   itemBuilder: (BuildContext context, int index) {
-                    final device =
-                    room_data_list[_selectedIndex]['devices'][index];
-                    return DeviceCard(
-                      isSelected: true,
-                      room: room_data_list[_selectedIndex]['name'],
-                      device: device,
+                    final device = room_data_list[_selectedIndex]['devices'][index];
+                    return GestureDetector(
+                      onTap: () {
+                        print(device);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DeviceDetailScreen(
+                              roomName: room_data_list[_selectedIndex]["name"],
+                              deviceType: device["name"],
+                            ),
+                          ),
+                        );
+                      },
+                      child: DeviceCard(
+                        isSelected: true,
+                        room: room_data_list[_selectedIndex]['name'],
+                        device: device,
+                      ),
                     );
                   },
+
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                 ),

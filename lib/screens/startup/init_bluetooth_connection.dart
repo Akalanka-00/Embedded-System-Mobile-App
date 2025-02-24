@@ -1,186 +1,151 @@
-import 'dart:async';
 import 'dart:developer';
-import 'package:flutter/material.dart';
-import 'package:bluetooth_classic/models/device.dart';
+import 'dart:typed_data';
 import 'package:bluetooth_classic/bluetooth_classic.dart';
+import 'package:flutter/material.dart';
+import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 import 'package:skynet/enum/device_configuration.dart';
+import 'package:skynet/enum/request_types.dart';
 import 'package:skynet/screens/home/home.dart';
-import 'package:skynet/utils/bluetooth/bluetooth_provider.dart';
+import 'package:skynet/service/bluetooth/bluetooth_handler.dart';
 import 'package:skynet/utils/shared_preferences/shared_preferences_service.dart';
+import 'dart:convert';
+
+import 'package:uuid/uuid.dart';
 
 class InitBluetooth extends StatefulWidget {
-  const InitBluetooth({super.key});
+  const InitBluetooth({Key? key}) : super(key: key);
 
   @override
   _InitBluetoothState createState() => _InitBluetoothState();
 }
 
 class _InitBluetoothState extends State<InitBluetooth> {
-  final BluetoothProvider _bluetoothProvider = BluetoothProvider();
-  final SharedPreferencesService _sharedPreferencesService =
-      SharedPreferencesService();
-
-  bool _isScanning = false;
-  List<Device> _pairedDevices = [];
-  List<Device> _discoveredDevices = [];
-  Timer? _scanTimer;
+  final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
+  QRViewController? controller;
+  String qrText = "FC:A8:9A:00:23:2D";
+  bool _scannedValidCode = true; // flag to indicate a valid code has been scanned
+  Uint8List _data = Uint8List(0);
 
   @override
-  void initState() {
-    super.initState();
-
-    // Fetch paired devices
-    _fetchPairedDevices();
-
-    // Listen for discovered devices from the Bluetooth provider
-    _bluetoothProvider.deviceDiscoveryStream.listen((device) {
-      setState(() {
-        if (!_discoveredDevices.contains(device)) {
-          _discoveredDevices.add(device);
-        }
-      });
-    });
-
-    // Start scanning automatically 3 seconds after the page opens
-    Future.delayed(Duration(seconds: 3), _startScanning);
+  void reassemble() {
+    super.reassemble();
+    if (controller != null) {
+      controller!.pauseCamera();
+      controller!.resumeCamera();
+    }
   }
 
-  // Fetch paired devices
-  void _fetchPairedDevices() async {
-    List<Device> pairedDevices = await _bluetoothProvider.getPairedDevices();
-    setState(() {
-      _pairedDevices = pairedDevices;
-      log("Paired devices: ${_pairedDevices.length}");
-    });
-  }
+  Future<void> connect() async {
+    BluetoothHandler().initBluetooth();
+    await BluetoothHandler().connect(qrText);
+    final prefsService = SharedPreferencesService();
+    final userId = await prefsService.getUserId();
+    if (userId == null) {
+      log("User ID not found in SharedPreferences.");
+      return;
+    }
+    String uuid = Uuid().v4();
+    final data = {
+      "action":"auth",
+      "userId":userId,
+      "uuid":uuid
+    };
 
-  // Start scanning for devices
-  void _startScanning() async {
-    setState(() {
-      _isScanning = true;
-    });
-    _discoveredDevices.clear();
-    await _bluetoothProvider.startScanning();
+    // "{\"action\": \"control\", \"userId\": \"String2 dup\", \"socketId\": \"Socket2\", \"status\": true}"
+    await BluetoothHandler().sendData(data);
 
-    // Stop scanning after 30 seconds
-    _scanTimer = Timer(Duration(seconds: 30), _stopScanning);
-  }
+    // Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomePage()));
 
-  // Stop scanning for devices
-  void _stopScanning() async {
-    setState(() {
-      _isScanning = false;
-    });
-    await _bluetoothProvider.stopScanning();
-    _scanTimer?.cancel();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-    _bluetoothProvider.dispose();
-    _scanTimer?.cancel();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Connect to Home Skynet"),
+        title: const Text("Connect to SkyNet", style: TextStyle(color: Colors.white)),
+        automaticallyImplyLeading: false,
         backgroundColor: const Color.fromARGB(255, 6, 26, 94),
-        titleTextStyle: TextStyle(color: Colors.white, fontSize: 20),
-        elevation: 4,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications, color: Colors.white),
+            onPressed: () {
+              // Handle notification icon press
+            },
+          ),
+        ],
+        elevation: 4.0,
+        shadowColor: Colors.black.withOpacity(0.5),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: _scannedValidCode
+          ? Center( // Center the content on the screen
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _buildSectionTitle("Paired Devices"),
-            _buildDeviceList(_pairedDevices, "No paired devices found"),
-            const SizedBox(height: 20),
-            _buildSectionTitle("Discovered Devices"),
-            _buildDeviceList(_discoveredDevices, "No devices discovered yet"),
-            const SizedBox(height: 20),
-            _buildScanningControl(),
+            const Text(
+              "Connecting to SkyNet...",
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),  // Add space between text and loader
+            const CircularProgressIndicator(
+              color: Colors.blueAccent,
+            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 20),
-      child: Text(
-        title,
-        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blueAccent),
-      ),
-    );
-  }
-
-  Widget _buildDeviceList(List<Device> devices, String emptyMessage) {
-    if (devices.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16.0),
-          child: Text(
-            emptyMessage,
-            style: TextStyle(fontSize: 16, color: Colors.grey),
-          ),
-        ),
-      );
-    }
-    return Expanded(
-      child: ListView.separated(
-        itemCount: devices.length,
-        separatorBuilder: (context, index) => Divider(color: Colors.grey[300]),
-        itemBuilder: (context, index) {
-          final device = devices[index];
-          return Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            child: ListTile(
-              leading: Icon(Icons.bluetooth, color: Colors.blueAccent),
-              title: Text(device.name ?? "Unknown Device", style: TextStyle(fontSize: 16)),
-              subtitle: Text(device.address, style: TextStyle(color: Colors.grey)),
-              trailing: Icon(Icons.join_full, size: 16, color: Colors.grey),
-              onTap: () async {
-                _sharedPreferencesService.saveIsNewDevice(false);
-                Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (context) => HomePage()));
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildScanningControl() {
-    return Center(
-      child: Column(
+      )
+          : Column(
         children: [
-          Text(
-            _isScanning ? "Scanning for devices..." : "Scan complete",
-            style: TextStyle(fontSize: 16, color: _isScanning ? Colors.blue : Colors.grey),
+          Expanded(
+            flex: 4,
+            child: QRView(
+              key: qrKey,
+              onQRViewCreated: _onQRViewCreated,
+            ),
           ),
-          const SizedBox(height: 10),
-          ElevatedButton.icon(
-            onPressed: _isScanning ? _stopScanning : _startScanning,
-            icon: Icon(_isScanning ? Icons.stop_circle_outlined : Icons.search),
-            label: Text(_isScanning ? "Stop Scanning" : "Start Scanning", style: TextStyle(color: Colors.white, fontSize: 16),),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              backgroundColor: _isScanning ? Colors.redAccent : Colors.blueAccent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              iconColor: Colors.white,
-              iconSize: _isScanning? 20 : 16
-              
+          Container(
+            height: 70,
+            color: const Color.fromARGB(255, 6, 26, 94),
+            child: const Center(
+              child: Text(
+                "Scan QR and Connect",
+                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  void _onQRViewCreated(QRViewController controller) {
+    this.controller = controller;
+    controller.scannedDataStream.listen((scanData) async {
+      final code = "FC:A8:9A:00:23:2D"; // For testing purposes, replace with scanData.code
+      // Regular expression for matching the QR code with the pattern
+      final regex = RegExp(r'^[A-Za-z0-9]{2}(:[A-Za-z0-9]{2}){5}$');
+      if (regex.hasMatch(code)) {
+        setState(() {
+          qrText = code;
+          _scannedValidCode = true;
+        });
+        debugPrint("Valid QR Code: $code");
+
+        // Call the connect method when a valid QR code is scanned
+        await connect();
+      } else {
+        debugPrint("Invalid QR Code scanned: $code");
+        // Keep scanning if the pattern doesn't match
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    controller?.dispose();
+    super.dispose();
   }
 }

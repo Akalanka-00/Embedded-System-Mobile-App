@@ -1,6 +1,7 @@
 enum DbCollections {
   users('users'),
-  rooms('rooms');
+  rooms('rooms'),
+  schedulers('schedulers');
 
   final String key;
   const DbCollections(this.key);
