@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:skynet/data/room_data.dart';
+import 'package:skynet/screens/home/home.dart';
+import 'package:skynet/service/bluetooth/bluetooth_handler.dart';
 import 'package:skynet/widgets/device_card.dart';
 import 'package:skynet/widgets/room_section.dart';
 import '../../../utils/firebase/db_service.dart';
@@ -25,7 +27,6 @@ class _AddFragmentState extends State<AddFragment> {
   @override
   void initState() {
     super.initState();
-    _deviceNameController.text = 'test123';
     _roomDataList = List.from(room_data_list);
     _socketBoxes = List.generate(8, (index) {
       return {
@@ -175,6 +176,15 @@ class _AddFragmentState extends State<AddFragment> {
     // Note: adjust addNewDevice signature as needed to include socketId.
     await _dbService.addNewDevice(roomName, deviceCategory, deviceName, socketId);
 
+
+    final data = {
+      "action":"ctrl",
+      "socket":socketId,
+      "user": userId,
+      "status": 0
+    };
+
+    await BluetoothHandler().sendData(data);
     // Show a success message
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -195,7 +205,10 @@ class _AddFragmentState extends State<AddFragment> {
       // Reset all socket statuses
       _socketBoxes = List.generate(8, (index) => {"id": index, "status": index == 3 ? 2 : 0});
     });
-
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => HomePage()),
+    );
     print("Device saved and state reset.");
   }
 

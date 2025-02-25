@@ -6,6 +6,9 @@ import 'package:skynet/screens/auth/signin.screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:skynet/screens/home/home.dart';
 import 'package:skynet/screens/startup/init_bluetooth_connection.dart';
+import 'package:skynet/service/bluetooth/bluetooth_handler.dart';
+import 'package:skynet/service/bluetooth/bluetooth_listner.dart';
+import 'package:skynet/service/schedulers/hartbeat_scheduler.dart';
 import 'package:skynet/utils/shared_preferences/shared_preferences_service.dart';
 
 Future<void> main() async {
@@ -20,17 +23,19 @@ class MainApp extends StatelessWidget {
     final sharedPreferencesService = SharedPreferencesService();
     try {
       await Firebase.initializeApp();
+      startHartBeatScheduler();
       User? user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         // Check if the user is verified
         bool isVerified = await checkUserVerificationStatus(user);
+
         if (isVerified) {
           if (await sharedPreferencesService.isNewDevice()) {
             return InitBluetooth();
           } else {
             return const HomePage();
           }
-          
+
         } else {
           return SignInScreen();
         }

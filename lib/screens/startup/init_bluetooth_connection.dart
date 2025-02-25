@@ -1,5 +1,6 @@
 import 'dart:developer';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:bluetooth_classic/bluetooth_classic.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
@@ -8,8 +9,6 @@ import 'package:skynet/enum/request_types.dart';
 import 'package:skynet/screens/home/home.dart';
 import 'package:skynet/service/bluetooth/bluetooth_handler.dart';
 import 'package:skynet/utils/shared_preferences/shared_preferences_service.dart';
-import 'dart:convert';
-
 import 'package:uuid/uuid.dart';
 
 class InitBluetooth extends StatefulWidget {
@@ -22,9 +21,11 @@ class InitBluetooth extends StatefulWidget {
 class _InitBluetoothState extends State<InitBluetooth> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   QRViewController? controller;
-  String qrText = "FC:A8:9A:00:23:2D";
-  bool _scannedValidCode = true; // flag to indicate a valid code has been scanned
-  Uint8List _data = Uint8List(0);
+  String qrText = "";
+  bool _scannedValidCode = false; // flag to indicate a valid code has been scanned
+
+  // Variable to hold the received Bluetooth message
+  String _receivedMessage = "";
 
   @override
   void reassemble() {
@@ -35,28 +36,70 @@ class _InitBluetoothState extends State<InitBluetooth> {
     }
   }
 
+  @override
+  void initState() {
+    super.initState();
+
+    // Subscribe to received Bluetooth messages
+    BluetoothHandler().receiveMessage((String message) {
+      setState(() {
+        // Trim leading and trailing whitespace/newlines
+        message = message.trim();
+
+        // Append to the received message if it's less than 4 characters
+
+          _receivedMessage += message;
+          const leadingChar = "=";
+          _receivedMessage = _receivedMessage.split(leadingChar)[_receivedMessage.split(leadingChar).length-1];
+
+      });
+
+      debugPrint("Updated Received Message: $_receivedMessage");
+    });
+
+  }
+
   Future<void> connect() async {
-    BluetoothHandler().initBluetooth();
+    await BluetoothHandler().initBluetooth();
     await BluetoothHandler().connect(qrText);
     final prefsService = SharedPreferencesService();
     final userId = await prefsService.getUserId();
+
     if (userId == null) {
       log("User ID not found in SharedPreferences.");
       return;
     }
+
     String uuid = Uuid().v4();
     final data = {
-      "action":"auth",
-      "userId":userId,
-      "uuid":uuid
+      "action": "auth",
+      "userId": userId,
+      "uuid": uuid
     };
 
-    // "{\"action\": \"control\", \"userId\": \"String2 dup\", \"socketId\": \"Socket2\", \"status\": true}"
+    // Send authentication request over Bluetooth
     await BluetoothHandler().sendData(data);
 
-    // Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomePage()));
+    debugPrint("Waiting for authentication confirmation...");
 
+    // Wait for authentication success message
+    while (_receivedMessage !="Auth SuccessfullyOK") {
+      await Future.delayed(const Duration(milliseconds: 500)); // Check every 500ms
+      // print("waiting for confirmation");
+    }
+
+
+    SharedPreferencesService prefService = SharedPreferencesService();
+    await prefService.saveIsNewDevice(false, address: qrText);
+    BluetoothHandler().isAuthenticated = true;
+    debugPrint("Authentication successful!");
+
+    // Navigate to home page after successful authentication
+    if (mounted) {
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomePage()));
+    }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +120,7 @@ class _InitBluetoothState extends State<InitBluetooth> {
         shadowColor: Colors.black.withOpacity(0.5),
       ),
       body: _scannedValidCode
-          ? Center( // Center the content on the screen
+          ? Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -90,7 +133,7 @@ class _InitBluetoothState extends State<InitBluetooth> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 10),  // Add space between text and loader
+            const SizedBox(height: 10),
             const CircularProgressIndicator(
               color: Colors.blueAccent,
             ),
@@ -124,7 +167,8 @@ class _InitBluetoothState extends State<InitBluetooth> {
   void _onQRViewCreated(QRViewController controller) {
     this.controller = controller;
     controller.scannedDataStream.listen((scanData) async {
-      final code = "FC:A8:9A:00:23:2D"; // For testing purposes, replace with scanData.code
+      // For testing purposes, using a fixed code.
+      final code = "FC:A8:9A:00:23:2D";
       // Regular expression for matching the QR code with the pattern
       final regex = RegExp(r'^[A-Za-z0-9]{2}(:[A-Za-z0-9]{2}){5}$');
       if (regex.hasMatch(code)) {

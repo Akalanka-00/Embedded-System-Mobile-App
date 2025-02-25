@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:skynet/service/bluetooth/bluetooth_handler.dart';
 import 'package:skynet/utils/firebase/db_service.dart';
+import 'package:skynet/utils/shared_preferences/shared_preferences_service.dart';
 
 class DeviceDetailScreen extends StatefulWidget {
   final String roomName;
@@ -122,7 +124,21 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
 
     // Updating the device status and appending the timestamp
     await dbService.updateDeviceStatus(roomName, deviceCategory, device['name'], status, DateTime.now().toIso8601String());
+    final prefsService = SharedPreferencesService();
+    final userId = await prefsService.getUserId();
+    if (userId == null) {
+      print("User ID not found in SharedPreferences.");
+      return;
+    }
+    print("socket${device["socket"]}");
+    final data = {
+      "action":"ctrl",
+      "socket":device['socket']+1,
+      "user": userId,
+      "status": status?1:0
+    };
 
+    BluetoothHandler().sendData(data);
     // Optionally, show a Snackbar or other feedback to the user
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Device status updated to: ${status ? 'On' : 'Off'}')),

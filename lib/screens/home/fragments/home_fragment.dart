@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:skynet/data/room_data.dart';
 import 'package:skynet/model/auth_data.model.dart';
 import 'package:skynet/screens/home/device_detail.dart';
+import 'package:skynet/service/bluetooth/bluetooth_handler.dart';
+import 'package:skynet/service/schedulers/hartbeat_scheduler.dart';
 import 'package:skynet/utils/firebase/db_service.dart';
 import 'package:skynet/utils/shared_preferences/shared_preferences_service.dart';
 import 'package:skynet/widgets/device_card.dart';
@@ -18,6 +20,7 @@ class HomeFragment extends StatefulWidget {
 class _HomeFragmentState extends State<HomeFragment> {
   final _sharedPreferencesService = SharedPreferencesService();
   var _userName = "Home";
+  var _address = "";
   bool _isBluetoothConnected = false;
   int _selectedIndex = 0;
   final _dbService = DbService();
@@ -25,19 +28,47 @@ class _HomeFragmentState extends State<HomeFragment> {
   @override
   void initState() {
     super.initState();
-    _loadUserName();
+    _loadPrefsAndConnect();
     _checkBluetoothConnection();
     _dbService.createDefaultRooms("userId");
   }
 
-  Future<void> _loadUserName() async {
+  @override
+  void dispose() {
+    // Stop the heartbeat scheduler when the widget is disposed
+    stopHartBeatScheduler();
+    super.dispose();
+  }
+
+  Future<void> _loadPrefsAndConnect() async {
     _userName = await _sharedPreferencesService.getUserName();
-    setState(() {});
+    _address = await _sharedPreferencesService.getMacAddress();
+    if (mounted) setState(() {});
+    print("Loaded Address: $_address");
+    // Only attempt to connect if _address is not empty
+    if (_address.isNotEmpty) {
+      await BluetoothHandler().connect(_address);
+      const data = {
+        "action":"sockets",
+        "sockets":[0,1,1,0,0,1,1,0]
+      };
+      // await BluetoothHandler().sendData(data);
+      startHartBeatScheduler();
+    } else {
+      print("No address available to connect.");
+    }
   }
 
   void _checkBluetoothConnection() {
-    _isBluetoothConnected = true;
+    BluetoothHandler().onConnectionStatusChanged.listen((bool isConnected) {
+      if (mounted) {
+        setState(() {
+          _isBluetoothConnected = isConnected;
+        });
+      }
+    });
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -69,14 +100,14 @@ class _HomeFragmentState extends State<HomeFragment> {
             ),
             _buildSchedulerCard(),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding:  EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                       Text(
                         "Rooms",
                         style: TextStyle(
                           color: Color.fromARGB(255, 6, 26, 94),
@@ -120,7 +151,6 @@ class _HomeFragmentState extends State<HomeFragment> {
                     final device = room_data_list[_selectedIndex]['devices'][index];
                     return GestureDetector(
                       onTap: () {
-                        print(device);
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -208,14 +238,14 @@ class _HomeFragmentState extends State<HomeFragment> {
                           Container(
                             width: 10,
                             height: 10,
-                            decoration: const BoxDecoration(
-                              color: Colors.green,
+                            decoration:  BoxDecoration(
+                              color: _isBluetoothConnected ? Colors.green : Colors.red,
                               shape: BoxShape.circle,
                             ),
                           ),
                           const SizedBox(width: 5),
-                          const Text(
-                            "Connected",
+                           Text(
+                            _isBluetoothConnected ? "Connected" : "Disconnected",
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,

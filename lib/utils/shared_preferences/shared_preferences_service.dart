@@ -9,6 +9,7 @@ class SharedPreferencesService {
   static const String _keyLogin_loggedTime = 'login-loggedTime';
 
   static const String _keyIsNewDevice = 'is-new-device';
+  static const String _skyNetAddress = "skynet_address";
 
 
   Future<void> saveLoginData(LoginData loginData) async {
@@ -52,9 +53,13 @@ Future<LoginData?> getLoginData() async {
     await prefs.remove(_keyLogin_loggedTime);
   }
 
-  Future<void> saveIsNewDevice(bool isNewDevice) async {
+  Future<void> saveIsNewDevice(bool isNewDevice, {String address = ""}) async {
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyIsNewDevice, isNewDevice);
+    await prefs.setString(_skyNetAddress, address);
+
+
   }
 
   Future<bool> isNewDevice() async {
@@ -65,5 +70,10 @@ Future<LoginData?> getLoginData() async {
   Future<String> getUserName() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_keyLogin_name) ?? '';
+  }
+
+  Future<String> getMacAddress() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_skyNetAddress) ?? '';
   }
 }
