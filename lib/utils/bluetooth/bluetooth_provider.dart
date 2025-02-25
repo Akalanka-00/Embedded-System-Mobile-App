@@ -26,22 +26,22 @@ class BluetoothProvider {
   List<Device> _discoveredDevices = [];
   bool _isScanning = false;
   int _deviceStatus = Device.disconnected;
-  Uint8List _receivedData = Uint8List(0);
+  // Uint8List _receivedData = Uint8List(0);
 
   // Stream controllers for events
   final StreamController<int> _deviceStatusController =
       StreamController<int>.broadcast();
   final StreamController<Device> _deviceDiscoveryController =
       StreamController<Device>.broadcast();
-  final StreamController<Uint8List> _dataReceivedController =
-      StreamController<Uint8List>.broadcast();
+  // final StreamController<Uint8List> _dataReceivedController =
+  //     StreamController<Uint8List>.broadcast();
 
   // Stream subscription for device discovery
   StreamSubscription<Device>? _deviceDiscoverySubscription;
 
   Stream<int> get deviceStatusStream => _deviceStatusController.stream;
   Stream<Device> get deviceDiscoveryStream => _deviceDiscoveryController.stream;
-  Stream<Uint8List> get dataReceivedStream => _dataReceivedController.stream;
+  // Stream<Uint8List> get dataReceivedStream => _dataReceivedController.stream;
 
   bool _isRequestingPermissions = false;
 
@@ -51,10 +51,10 @@ class BluetoothProvider {
       _deviceStatusController.add(status);
     });
 
-    _bluetoothClassicPlugin.onDeviceDataReceived().listen((data) {
-      _receivedData = Uint8List.fromList([..._receivedData, ...data]);
-      _dataReceivedController.add(data);
-    });
+    // _bluetoothClassicPlugin.onDeviceDataReceived().listen((data) {
+    //   _receivedData = Uint8List.fromList([..._receivedData, ...data]);
+    //   _dataReceivedController.add(data);
+    // });
   }
 
   Future<void> checkAndEnableBluetooth() async {
@@ -247,7 +247,7 @@ Future<void> startScanning() async {
   void dispose() {
     _deviceStatusController.close();
     _deviceDiscoveryController.close();
-    _dataReceivedController.close();
+    // _dataReceivedController.close();
     _deviceDiscoverySubscription?.cancel();
   }
 }
